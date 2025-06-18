@@ -79,7 +79,7 @@
                                 </td>
                                 <td class="px-4 py-4 whitespace-nowrap text-sm">
                                     <div @dblclick="if(['Siap Dihantar', 'Dihantarkan', 'Diterima'].includes(order.order_status)) isEditingStatus = true" 
-                                         :class="{'cursor-pointer': ['Siap Dihantar', 'Dihantarkan', 'Diterima'].includes(order.order_status)}">
+                                        :class="{'cursor-pointer': ['Siap Dihantar', 'Dihantarkan', 'Diterima'].includes(order.order_status)}">
                                         
                                         <div x-show="!isEditingStatus">
                                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full" :class="statusClass()" x-text="order.order_status"></span>
