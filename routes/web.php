@@ -5,8 +5,9 @@ use App\Http\Controllers\ProfileController; // Untuk halaman profil pengguna (ba
 use App\Http\Controllers\Admin\UserController; // Controller untuk manajemen pengguna oleh Admin
 use App\Http\Controllers\Admin\MenuItemController; // Controller untuk manajemen menu (akan kita gunakan nanti)
 use App\Http\Controllers\Admin\RoomController;
-use App\Http\Controllers\Admin\SopViolationController; // <-- Tambahkan ini
+use App\Http\Controllers\Admin\SopViolationController; 
 use App\Http\Controllers\Admin\RoomTypeController;
+use App\Http\Middleware\RedirectBasedOnRole;
 use App\Http\Controllers\Receptionist\OrderController as ReceptionistOrderController;
 
 /*
@@ -28,8 +29,9 @@ Route::get('/', function () {
 // Dashboard umum untuk pengguna yang sudah login (jika tidak ada pengalihan peran spesifik)
 // Atau sebagai fallback jika peran tidak terdefinisi untuk pengalihan khusus.
 Route::get('/dashboard', function () {
+    // Kode ini tidak akan dieksekusi jika peran pengguna cocok di middleware.
     return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard'); // 'verified' jika Anda menggunakan verifikasi email
+})->middleware(['auth', 'verified', RedirectBasedOnRole::class])->name('dashboard');// 'verified' jika Anda menggunakan verifikasi email
 
 // ==================================================
 // --- GRUP RUTE KHUSUS UNTUK ADMIN ---
@@ -131,6 +133,8 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
+
+Route::redirect('/profile', '/');
 
 // Memuat rute-rute autentikasi (login, register khusus admin, logout, dll.)
 require __DIR__.'/auth.php';
