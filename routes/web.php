@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\SopViolationController;
 use App\Http\Controllers\Admin\RoomTypeController;
 use App\Http\Middleware\RedirectBasedOnRole;
 use App\Http\Controllers\Receptionist\OrderController as ReceptionistOrderController;
+use App\Jobs\DummyJob;
 
 /*
 |--------------------------------------------------------------------------
@@ -135,6 +136,12 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::redirect('/profile', '/');
+
+
+Route::get('/test-job', function () {
+    DummyJob::dispatch();
+    return '🎉 DummyJob dispatched!';
+});
 
 // Memuat rute-rute autentikasi (login, register khusus admin, logout, dll.)
 require __DIR__.'/auth.php';
