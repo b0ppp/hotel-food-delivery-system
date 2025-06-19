@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\RoomTypeController;
 use App\Http\Controllers\Receptionist\OrderController as ReceptionistOrderController;
 use App\Http\Controllers\Kitchen\DashboardController as KitchenDashboardController;
 use App\Http\Controllers\Delivery\DashboardController as DeliveryDashboardController;
+use App\Jobs\DummyJob;
 
 /*
 |--------------------------------------------------------------------------
@@ -123,4 +124,11 @@ Route::middleware(['auth', 'delivery'])
 Route::redirect('/profile', '/');
 
 // Memuat rute-rute autentikasi
+
+Route::get('/test-job', function () {
+    DummyJob::dispatch();
+    return '🎉 DummyJob dispatched!';
+});
+
+// Memuat rute-rute autentikasi (login, register khusus admin, logout, dll.)
 require __DIR__.'/auth.php';

@@ -61,7 +61,7 @@
                                             {{ $room->room_number }}
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                                            {{ $room->room_type }}
+                                            {{ $room->roomType?->name ?? 'Tipe Dihapus'}}
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm">
                                             @if ($room->status == 'Terisi')
