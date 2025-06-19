@@ -19,7 +19,7 @@ class RoomController extends Controller
     public function index(): View
     {
         // Ambil semua data kamar, urutkan berdasarkan nomor kamar, dan gunakan paginasi
-        $rooms = Room::orderBy('room_number', 'asc')->paginate(10); // Tampilkan 10 kamar per halaman
+        $rooms = Room::with('roomType')->orderBy('room_number', 'asc')->paginate(10); // Tampilkan 10 kamar per halaman
 
         // Kirim data kamar ke view
         return view('admin.rooms.index', compact('rooms'));
