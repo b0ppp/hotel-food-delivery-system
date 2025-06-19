@@ -1,140 +1,126 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\ProfileController; // Untuk halaman profil pengguna (bawaan Breeze)
-use App\Http\Controllers\Admin\UserController; // Controller untuk manajemen pengguna oleh Admin
-use App\Http\Controllers\Admin\MenuItemController; // Controller untuk manajemen menu (akan kita gunakan nanti)
+use Illuminate\Support\Facades\Auth; // <-- PASTIKAN BARIS INI ADA
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\MenuItemController;
 use App\Http\Controllers\Admin\RoomController;
-use App\Http\Controllers\Admin\SopViolationController; 
+use App\Http\Controllers\Admin\SopViolationController;
 use App\Http\Controllers\Admin\RoomTypeController;
-use App\Http\Middleware\RedirectBasedOnRole;
 use App\Http\Controllers\Receptionist\OrderController as ReceptionistOrderController;
+use App\Http\Controllers\Kitchen\DashboardController as KitchenDashboardController;
+use App\Http\Controllers\Delivery\DashboardController as DeliveryDashboardController;
 
 /*
 |--------------------------------------------------------------------------
 | Web Routes
 |--------------------------------------------------------------------------
-|
-| Di sinilah Anda bisa mendaftarkan rute web untuk aplikasi Anda. Rute-rute
-| ini dimuat oleh RouteServiceProvider dan semuanya akan
-| ditugaskan ke grup middleware "web". Buat sesuatu yang hebat!
-|
 */
 
-// Halaman selamat datang (publik)
+// --- LOGIKA PENGALIHAN UTAMA ---
+// Rute ini akan menjadi titik masuk aplikasi Anda
 Route::get('/', function () {
-    return view('auth.login');
+    // 1. Cek apakah pengguna sudah login
+    if (Auth::check()) {
+        // Jika sudah, dapatkan peran dan alihkan ke dashboard yang sesuai
+        $user = Auth::user();
+        if ($user->role) {
+            switch ($user->role->role_name) {
+                case 'Admin':
+                    return redirect()->route('admin.dashboard');
+                case 'Resepsionis':
+                    return redirect()->route('receptionist.order.create');
+                case 'Staf Dapur':
+                    return redirect()->route('kitchen.dashboard');
+                case 'Staf Antar':
+                    return redirect()->route('delivery.dashboard');
+            }
+        }
+        // Jika pengguna ada tapi tidak punya peran, logout untuk keamanan
+        Auth::logout();
+        return redirect()->route('login')->with('error', 'Peran Anda tidak dapat ditemukan.');
+    }
+
+    // 2. Jika belum login, selalu arahkan ke halaman login
+    return redirect()->route('login');
 });
 
-// Dashboard umum untuk pengguna yang sudah login (jika tidak ada pengalihan peran spesifik)
-// Atau sebagai fallback jika peran tidak terdefinisi untuk pengalihan khusus.
+
+// --- RUTE PENYORTIR SETELAH LOGIN ---
+// Rute ini penting sebagai tujuan default setelah pengguna mengisi form login.
 Route::get('/dashboard', function () {
-    // Kode ini tidak akan dieksekusi jika peran pengguna cocok di middleware.
-    return view('dashboard');
-})->middleware(['auth', 'verified', RedirectBasedOnRole::class])->name('dashboard');// 'verified' jika Anda menggunakan verifikasi email
-
-// ==================================================
-// --- GRUP RUTE KHUSUS UNTUK ADMIN ---
-// ==================================================
-Route::middleware(['auth', 'admin']) // Hanya bisa diakses oleh user yang login DAN adalah Admin
-    ->prefix('admin')               // Semua URL akan diawali dengan /admin (cth: /admin/dashboard)
-    ->name('admin.')                // Semua nama rute akan diawali dengan admin. (cth: admin.dashboard)
-    ->group(function () {
-
-    // Dashboard Admin
-    Route::get('/dashboard', function () {
-        return view('admin.dashboard'); // Menggunakan view resources/views/admin/dashboard.blade.php
-    })->name('dashboard'); // Nama rute lengkap: admin.dashboard
-
-    // Manajemen Pengguna oleh Admin
-    // Kita menggunakan Route::resource tetapi mengecualikan 'create' dan 'store'
-    // karena fungsi tersebut sudah ditangani oleh halaman /register (RegisteredUserController)
-    // Kita juga mengecualikan 'show' untuk saat ini karena belum kita implementasikan.
-    Route::resource('users', UserController::class)
-        ->except(['create', 'store', 'show']) // Metode yang tidak akan dibuatkan rutenya untuk UserController
-        ->names([ // Memberi nama eksplisit untuk konsistensi
-            'index'   => 'users.index',   // Menjadi admin.users.index (GET /admin/users)
-            'edit'    => 'users.edit',    // Menjadi admin.users.edit (GET /admin/users/{user}/edit)
-            'update'  => 'users.update',  // Menjadi admin.users.update (PUT/PATCH /admin/users/{user})
-            'destroy' => 'users.destroy', // Menjadi admin.users.destroy (DELETE /admin/users/{user})
-        ]);
-
-    // Manajemen Menu oleh Admin (akan kita implementasikan nanti)
-    // Ini juga menggunakan resource controller, dan semua rutenya akan memiliki prefix /admin dan nama admin.
-    Route::resource('menu-items', MenuItemController::class)->names('menuitems');
-
-    // Rute untuk Manajemen Kamar oleh Admin
-    Route::resource('rooms', RoomController::class)->names('rooms');
-    // Ini akan membuat rute seperti: admin.rooms.index, admin.rooms.create, dll.
-
-    // Rute untuk Manajemen Tipe Kamar
-    Route::resource('room-types', RoomTypeController::class)->names('roomtypes');
-
-    // --- TAMBAHKAN RUTE INI ---
-    Route::get('/sop-violations', [SopViolationController::class, 'index'])->name('sop-violations.index');
-});
-// --- AKHIR GRUP RUTE ADMIN ---
-
-// --- GRUP RUTE UNTUK RESEPSIONIS ---
-Route::middleware(['auth', 'receptionist'])
-    ->prefix('receptionist')
-    ->name('receptionist.')
-    ->group(function () {
-
-        // Rute-rute yang sudah ada
-        Route::get('/order/create', [ReceptionistOrderController::class, 'create'])->name('order.create');
-        Route::post('/orders', [ReceptionistOrderController::class, 'store'])->name('orders.store');
-
-        // --- TAMBAHKAN DUA RUTE DI BAWAH INI ---
-
-        // 1. Rute untuk menampilkan halaman riwayat (GET)
-        Route::get('/orders/history', [ReceptionistOrderController::class, 'history'])->name('orders.history');
-
-        // 2. Rute untuk menghapus pesanan (DELETE)
-        Route::delete('/orders/{order}', [ReceptionistOrderController::class, 'destroy'])->name('orders.destroy');
-});
-
-// Staf Dapur
-Route::middleware(['auth', 'kitchen'])
-    ->prefix('kitchen')
-    ->name('kitchen.')
-    ->group(function () {
-        // Rute untuk menampilkan dashboard
-        Route::get('/dashboard', [\App\Http\Controllers\Kitchen\DashboardController::class, 'index'])->name('dashboard');
-
-        // Rute untuk menandai pesanan sebagai siap (aksi dari checklist)
-        Route::patch('/orders/{order}/mark-as-ready', [\App\Http\Controllers\Kitchen\DashboardController::class, 'markAsReady'])->name('orders.mark-as-ready');
-
-        // Di dalam grup rute kitchen
-        Route::patch('/orders/{order}/uncheck', [\App\Http\Controllers\Kitchen\DashboardController::class, 'uncheck'])->name('orders.uncheck');
-});
-
-// Staf Antar
-Route::middleware(['auth', 'delivery'])
-    ->prefix('delivery')
-    ->name('delivery.')
-    ->group(function () {
-        // Rute untuk menampilkan dashboard utama
-        Route::get('/dashboard', [\App\Http\Controllers\Delivery\DashboardController::class, 'index'])->name('dashboard');
-
-        // Rute untuk aksi memilih staf (Cook atau Delivery) dari dropdown
-        Route::patch('/orders/{order}/assign-staff', [\App\Http\Controllers\Delivery\DashboardController::class, 'assignStaff'])->name('orders.assign-staff');
-
-        // Rute untuk aksi mengubah status pesanan
-        Route::patch('/orders/{order}/update-status', [\App\Http\Controllers\Delivery\DashboardController::class, 'updateStatus'])->name('orders.update-status');
-});
+    // Logika ini sama persis dengan di atas, untuk menangani pengalihan pasca-login.
+    $user = Auth::user();
+    if ($user->role) {
+        switch ($user->role->role_name) {
+            case 'Admin': return redirect()->route('admin.dashboard');
+            case 'Resepsionis': return redirect()->route('receptionist.order.create');
+            case 'Staf Dapur': return redirect()->route('kitchen.dashboard');
+            case 'Staf Antar': return redirect()->route('delivery.dashboard');
+        }
+    }
+    Auth::logout();
+    return redirect()->route('login')->with('error', 'Peran Anda tidak dapat ditemukan.');
+})->middleware(['auth', 'verified'])->name('dashboard');
 
 
+// --- SISA RUTE APLIKASI (Tidak ada perubahan) ---
 
-
-// Rute untuk Manajemen Profil Pengguna (bawaan Breeze, untuk semua pengguna yang sudah login)
+// Rute Manajemen Profil
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
+// Grup Rute Admin
+Route::middleware(['auth', 'admin'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+        Route::get('/dashboard', function () {
+            return view('admin.dashboard');
+        })->name('dashboard');
+        Route::resource('users', UserController::class)->except(['create', 'store', 'show']);
+        Route::resource('menu-items', MenuItemController::class)->names('menuitems');
+        Route::resource('rooms', RoomController::class)->names('rooms');
+        Route::resource('room-types', RoomTypeController::class)->names('roomtypes');
+        Route::get('/sop-violations', [SopViolationController::class, 'index'])->name('sop-violations.index');
+    });
+
+// Grup Rute Resepsionis
+Route::middleware(['auth', 'receptionist'])
+    ->prefix('receptionist')
+    ->name('receptionist.')
+    ->group(function () {
+        Route::get('/order/create', [ReceptionistOrderController::class, 'create'])->name('order.create');
+        Route::post('/orders', [ReceptionistOrderController::class, 'store'])->name('orders.store');
+        Route::get('/orders/history', [ReceptionistOrderController::class, 'history'])->name('orders.history');
+        Route::delete('/orders/{order}', [ReceptionistOrderController::class, 'destroy'])->name('orders.destroy');
+    });
+
+// Grup Rute Staf Dapur
+Route::middleware(['auth', 'kitchen'])
+    ->prefix('kitchen')
+    ->name('kitchen.')
+    ->group(function () {
+        Route::get('/dashboard', [KitchenDashboardController::class, 'index'])->name('dashboard');
+        Route::patch('/orders/{order}/mark-as-ready', [KitchenDashboardController::class, 'markAsReady'])->name('orders.mark-as-ready');
+        Route::patch('/orders/{order}/uncheck', [KitchenDashboardController::class, 'uncheck'])->name('orders.uncheck');
+    });
+
+// Grup Rute Staf Antar
+Route::middleware(['auth', 'delivery'])
+    ->prefix('delivery')
+    ->name('delivery.')
+    ->group(function () {
+        Route::get('/dashboard', [DeliveryDashboardController::class, 'index'])->name('dashboard');
+        Route::patch('/orders/{order}/assign-staff', [DeliveryDashboardController::class, 'assignStaff'])->name('orders.assign-staff');
+        Route::patch('/orders/{order}/update-status', [DeliveryDashboardController::class, 'updateStatus'])->name('orders.update-status');
+    });
+
 Route::redirect('/profile', '/');
 
-// Memuat rute-rute autentikasi (login, register khusus admin, logout, dll.)
+// Memuat rute-rute autentikasi
 require __DIR__.'/auth.php';
